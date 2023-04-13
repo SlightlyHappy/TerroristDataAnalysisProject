@@ -1,0 +1,206 @@
+---
+title: "FinalProjectPSYC417"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+totaldata <- read.csv("~/Downloads/globalterrorismdb_0718dist.csv", comment.char="#")
+
+#This bit of data below shows the target(s) of the attack and where the attacks' been done - along with the number of attacks arranged in descending order
+
+dataques1 <- totaldata%>%
+  select(country, country_txt, targtype1, targtype1_txt, targsubtype1_txt, targsubtype1)%>%
+  group_by(country, country_txt, targtype1_txt, targtype1)%>%
+  summarise(Num = n())%>%
+  arrange(desc(Num))
+
+View(dataques1)
+
+
+#setting arbritary value of 800 attacks to pull countries for analyses 
+counques1 <-  dataques1%>%
+  filter(Num >= 800)%>%
+  group_by(country_txt)%>%
+  distinct(country)
+print(counques1$country_txt)
+View(counques1)
+#the countries being analysed are 95 ,  4, 153,  92, 147, 603, 182,  45, 160,  61, 159,  97, 228, 185, 145, 209, 205,   6, 200, 214,  60,  and 155
+
+#selecting targets for analyses
+tagrques1 <- dataques1%>%
+  filter(Num >= 800)%>%
+  group_by(targtype1_txt, targtype1)%>%
+  distinct(targtype1)
+tagrques1$targtype1_txt
+View(tagrques1)
+#the most common target types are 14,  3,  4,  2,  1, 20, 21, 17,  8 , and 19
+
+#running a one way anova one countries with moree than 800 attacks
+
+aovmodeldata <- dataques1%>%
+  filter(Num >= 800)
+View(aovmodeldata)
+
+onewayaov <- aov(Num ~ country_txt, data=aovmodeldata)
+summary(onewayaov)
+
+#not significant result, no need for TukeyHSD.
+
+#plot1 - showing the number of attacks per country 
+ggplot(aovmodeldata, aes(x = Num, y = country_txt, fill = country_txt))+
+  geom_boxplot()+
+  theme_bw()+
+  xlab("Number of attacks")+
+  ylab("Country name")+
+  guides(fill = FALSE)
+
+
+#plot2 - showing the most common attacks per country 
+ggplot(aovmodeldata, aes(x = Num, y = targtype1_txt, fill = targtype1_txt))+
+  geom_boxplot()+
+  theme_bw()+
+  xlab("Number of attacks")+
+  ylab("type of attack")+
+  guides(fill = FALSE)
+
+#plot3 trying three variables
+ggplot(aovmodeldata, aes(x = targtype1_txt, y = country_txt, fill = Num))+
+  geom_tile()+
+  ylab("country name")+
+  xlab("target type")+
+  theme_bw()
+
+
+```
+
+
+```{r}
+#segregating thee possible outcomes of host kidnapping into two different groups 1 and 0 where 1 is a positive outcome and 0 is not. 
+totaldata$host0or1[totaldata$hostkidoutcome == c(2,3,5)] <- 1
+totaldata$host0or1[totaldata$hostkidoutcome == c(1,4,6,7)] <- 0
+
+dataques2 <- totaldata%>%
+  select(country, country_txt, targtype1, targtype1_txt, host0or1, hostkidoutcome_txt)%>%
+  filter(!is.na(host0or1))%>%
+  group_by(country_txt, host0or1)%>%
+  summarise(numkid = n())
+
+
+
+
+View(dataques2)
+
+#reducing and selecting numbere of countries for analyses 
+numberkid <- totaldata%>%
+  select(country, country_txt, attacktype1, attacktype1_txt, targtype1, targtype1_txt, host0or1, hostkidoutcome_txt)%>%
+  filter(attacktype1 == c(5,6))%>%
+  group_by(country)%>%
+  summarise(numberofkidnap = n())%>%
+  arrange(desc(numberofkidnap))
+
+View(numberkid)
+
+#now subsetting countries for analyses
+
+countrykidnap <- numberkid%>%
+  filter(numberofkidnap >= 200)
+
+View(countrykidnap)
+#countries for analyses are 92 , 45  , 4,  95, 153, 160, 147, 113, 228
+
+#refining dataques2 
+
+dataques2.1 <- totaldata%>%
+  select(country, country_txt, targtype1, targtype1_txt, host0or1, hostkidoutcome_txt)%>%
+  filter(!is.na(host0or1))%>%
+  filter(country == c(92 , 45  , 4,  95, 153, 160, 147, 113, 228))%>%
+  group_by(country_txt, host0or1)%>%
+  summarise(numkid = n())
+
+View(dataques2.1)
+
+#running a paired t-test or lm -- ???
+two2model <- t.test(numkid~host0or1, data= dataques2.1, paired = TRUE)
+
+two2model
+summary(two2model)
+#plotting the model 
+class(dataques2.1$host0or1)
+dataques2.1$host0or1 <- factor(dataques2.1$host0or1, levels = c(0,1), labels = c("Non-successful", "Successful"))
+
+ggplot(dataques2.1, aes(x = country_txt, y = numkid, fill = host0or1 ))+
+  geom_boxplot()+
+  theme_classic()+
+  geom_hline(yintercept = 0)+
+  xlab("Kidnapping outcomes 0 (positive), 1 (negative)")+
+  ylab("Number of kidnappingss")
+
+```
+
+```{r}
+
+#descriptive statistics for question 3
+
+dataques3 <- totaldata%>%
+  select(gname, weaptype1, weaptype1_txt, nkill)%>%
+  filter(!is.na(nkill))%>%
+  arrange(desc(nkill))
+
+View(dataques3)
+
+
+
+#finding which weptype was the most lethal - which waepontype killed the most people
+wepondeath <- dataques3%>%
+  group_by(nkill)%>%
+  summarise(weap = weaptype1_txt)%>%
+  arrange(desc(nkill))%>%
+  filter(nkill >= 80)
+View(wepondeath)
+#plot1 - for showing the number of victims for specific weapon types
+ggplot(wepondeath, aes(x = weap, y=nkill, fill = weap))+
+  geom_boxplot()+
+  xlab("weapon type")+
+  ylab("number of vicitms")+
+  guides(fill =FALSE)
+
+#finding which weptype was the most common and by which group - most common weapon is also seen to have the most lehtalities 
+
+comonwep <- dataques3%>%
+  group_by(weaptype1_txt)%>%
+  summarise(freq = n())%>%
+  filter(freq >= 80)%>%
+  arrange(desc(freq))
+View(comonwep)
+
+#plot2 - to show which weapons had the most frequency of us
+
+ggplot(comonwep, aes(x = weaptype1_txt, y = freq, fill = weaptype1_txt))+
+  geom_col()+
+  guides(fill = FALSE)+
+  ylab("frequency of waepon use")+
+  xlab("Weapon type")
+
+#which groups commit the most number of attacks
+
+groupating <- dataques3%>%
+  group_by(gname)%>%
+  summarise(gpating = n())%>%
+  arrange(desc(gpating))%>%
+  filter(gpating >= 1000)%>%
+  filter(gname != "Unknown")
+View(groupating)
+
+#plot3 - to show which groups conducted the most number of attacks 
+
+
+ggplot(groupating, aes(x=gpating, y=gname))+
+  geom_col()+
+  ylab("Name of terrorist group")+
+  xlab("Number of attacks")
+
+```
